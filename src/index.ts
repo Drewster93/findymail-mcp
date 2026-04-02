@@ -2,6 +2,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 const BASE_URL = "https://app.findymail.com";
@@ -558,9 +561,38 @@ server.tool(
 // ── Start Server ────────────────────────────────────────────────────────────
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Findymail MCP server running on stdio");
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
+
+  if (port) {
+    // HTTP mode for remote MCP connections
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+
+    const httpServer = createServer(async (req, res) => {
+      const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+
+      // Only handle /mcp path
+      if (url.pathname !== "/mcp") {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not found. Use /mcp endpoint." }));
+        return;
+      }
+
+      await transport.handleRequest(req, res);
+    });
+
+    await server.connect(transport);
+
+    httpServer.listen(port, () => {
+      console.error(`Findymail MCP server running on http://0.0.0.0:${port}/mcp`);
+    });
+  } else {
+    // Stdio mode for local MCP connections (e.g., Claude Desktop)
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Findymail MCP server running on stdio");
+  }
 }
 
 main().catch((error) => {
