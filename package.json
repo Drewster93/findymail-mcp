@@ -1,0 +1,29 @@
+{
+  "name": "findymail-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for the Findymail API - email finder, verifier, and more",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "findymail-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Drewster93/findymail-mcp"
+  },
+  "keywords": ["mcp", "findymail", "email-finder", "email-verifier"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}
