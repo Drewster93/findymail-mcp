@@ -57,6 +57,7 @@ async function apiRequest(
   return { status: response.status, data };
 }
 
+function createFindymailServer(): McpServer {
 const server = new McpServer({
   name: "findymail",
   version: "1.0.0",
@@ -558,31 +559,60 @@ server.tool(
   }
 );
 
+return server;
+}
+
 // ── Start Server ────────────────────────────────────────────────────────────
 
 async function main() {
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
 
   if (port) {
-    // HTTP mode for remote MCP connections
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-    });
+    // HTTP mode for remote MCP connections — one transport+server per session
+    const sessions = new Map<string, StreamableHTTPServerTransport>();
 
     const httpServer = createServer(async (req, res) => {
       const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
-      // Only handle /mcp path
       if (url.pathname !== "/mcp") {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Not found. Use /mcp endpoint." }));
         return;
       }
 
-      await transport.handleRequest(req, res);
-    });
+      // Route to existing session if present
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      if (sessionId && sessions.has(sessionId)) {
+        const transport = sessions.get(sessionId)!;
+        await transport.handleRequest(req, res);
+        return;
+      }
 
-    await server.connect(transport);
+      // New session: only POST can initialize
+      if (req.method === "POST") {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+        });
+
+        transport.onclose = () => {
+          if (transport.sessionId) {
+            sessions.delete(transport.sessionId);
+          }
+        };
+
+        const server = createFindymailServer();
+        await server.connect(transport);
+        await transport.handleRequest(req, res);
+
+        // Session ID is assigned after handling the initialization request
+        if (transport.sessionId) {
+          sessions.set(transport.sessionId, transport);
+        }
+      } else {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No valid session. Send a POST to initialize." }));
+      }
+    });
 
     httpServer.listen(port, () => {
       console.error(`Findymail MCP server running on http://0.0.0.0:${port}/mcp`);
@@ -590,6 +620,7 @@ async function main() {
   } else {
     // Stdio mode for local MCP connections (e.g., Claude Desktop)
     const transport = new StdioServerTransport();
+    const server = createFindymailServer();
     await server.connect(transport);
     console.error("Findymail MCP server running on stdio");
   }
