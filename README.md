@@ -17,6 +17,10 @@ Retrieve your API token from the [Findymail API page](https://app.findymail.com/
 
 ### 3. Configure in your MCP client
 
+The server supports two transport modes:
+
+#### Stdio mode (local, e.g., Claude Desktop)
+
 Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_config.json`):
 
 ```json
@@ -32,6 +36,16 @@ Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_confi
   }
 }
 ```
+
+#### HTTP mode (remote connections)
+
+Set the `PORT` environment variable to start the server with Streamable HTTP transport:
+
+```bash
+FINDYMAIL_API_KEY=your-api-key PORT=3000 node dist/index.js
+```
+
+The MCP endpoint will be available at `http://localhost:3000/mcp`. Configure your MCP client to connect to this URL.
 
 ## Available Tools
 
